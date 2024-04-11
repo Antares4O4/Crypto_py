@@ -3,7 +3,6 @@ a = 9
 c = 12
 m = 137
 
-
 def func_parity_check(n):  # Проверка на чётность/нечетность
     n_bin = format(n, '#010b')
     n_str = str(n_bin[2:])
