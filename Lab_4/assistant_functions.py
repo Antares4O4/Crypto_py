@@ -64,7 +64,7 @@ def multiplicative_inverse(a, b):  # Расширенный алгоритм Е�
     return lx
 
 
-def add_zero_if_less_than_n(arr, n):
+def add_zero(arr, n):
     new_arr = []
     for i, num in enumerate(arr):
         if 0 < i < len(arr) and len(str(num)) < len(str(n)):  # Проверка позиции и значения
