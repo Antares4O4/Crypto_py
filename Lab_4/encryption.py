@@ -11,15 +11,9 @@ def enc(e, n, text):  # Шифрование
     for i in range(len(M)):
         C.append(af.fast_pow(M[i], e) % n)
 
-
     C_str = af.num_to_str(C)
     C_text = af.num_to_text(C_str)
 
-
     print(f"Зашифрованный текст = {C_text}")
 
-
     return C
-
-
-

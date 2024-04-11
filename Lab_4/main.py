@@ -6,7 +6,7 @@ e, n, d = key()[:-1]
 
 
 def main_func(e, d, n):
-    text = "пярпхфжыпгцяфцмцошещ"
+    text = "ААААААААААААААААААААААААА"
 
     C = encryption.enc(e, n, text)
 
