@@ -30,21 +30,24 @@ def keys_main():
 
     print(keys)
 
-    print("\nВведите номер пары (число от 1 до 3 включительно):")
+    i = True
+    while i:
+        flag = input("\nВведите номер пары (число от 1 до 3 включительно):")
 
-    while True:
-        flag = input()
         if flag == "1":
             print(f"\nВы выбрали пару {keys[0]}.")
+            i = False
             return keys[0]
 
 
         elif flag == "2":
             print(f"\nВы выбрали пару {keys[1]}.")
+            i = False
             return keys[1]
 
         elif flag == "3":
             print(f"\nВы выбрали пару {keys[2]}.")
+            i = False
             return keys[2]
 
         else:

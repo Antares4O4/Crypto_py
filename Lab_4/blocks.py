@@ -2,9 +2,9 @@ import assistant_functions as af
 
 
 def split_string_into_blocks(str_num_text, n):
-    lenth = len(str_num_text)  # текущая длина поледовательности
+    lenth = len(str_num_text)
     blocks = []
-
+    print(str_num_text)
     while lenth > 0:
         i = 1
         block = str_num_text[:i]
@@ -26,6 +26,7 @@ def split_string_into_blocks(str_num_text, n):
 
 def blocks(text, mod):
     str_num = af.text_to_num_3(text)
+    print(str_num)
     U = split_string_into_blocks(str_num, mod)
     blocks_list = list(map(int, U))
 

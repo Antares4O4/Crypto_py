@@ -10,6 +10,7 @@ def main_enc(e, n, path_0):
     with open(path_0, 'r', encoding='utf-8') as f:
         text = f.read()
 
+    text = text.upper()
     C = encryption.enc(e, n, text)
     print(f"C = {C}")
 
