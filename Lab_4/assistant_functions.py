@@ -5,17 +5,6 @@ Alfavit = {'А': 10, 'Б': 11, 'В': 12, 'Г': 13, 'Д': 14, 'Е': 15, 'Ж': 16,
 Alf_2 = {v: k for k, v in Alfavit.items()}
 
 
-def text_to_num(text):  # Преобразование текста в строку чисел
-
-    char_array = text.upper()
-
-    key_array = [Alfavit[char] for char in char_array]
-
-    a = ''.join(map(str, key_array))
-
-    return a
-
-
 def num_to_text(text):  # Преобразование из чисел в буквы
     Alf_2 = {v: k for k, v in Alfavit.items()}
     for key in Alf_2.keys():
@@ -23,7 +12,7 @@ def num_to_text(text):  # Преобразование из чисел в бук
     return text
 
 
-def num_to_str(l):  # Преобразование массива в строку чисел
+def list_to_str(l):  # Преобразование массива в строку чисел
     lst = list(map(str, l))
     string = ''
 
@@ -64,17 +53,7 @@ def multiplicative_inverse(a, b):  # Расширенный алгоритм Е�
     return lx
 
 
-def add_zero(arr, n):
-    new_arr = []
-    for i, num in enumerate(arr):
-        if 0 < i < len(arr) and len(str(num)) < len(str(n)):  # Проверка позиции и значения
-            new_arr.append("0" + str(num))  # Добавление "0" слева
-        else:
-            new_arr.append(str(num))  # Добавление элемента без изменений
-
-    return new_arr
-
-
-def num_to_text_2(text):
-    decrypted_text = ''.join([Alf_2[int(text[i:i + 2])] for i in range(0, len(text), 2)])
-    print("Расшифрованный текст:", decrypted_text)
+def text_to_num_3(text):
+    for key in Alfavit.keys():
+        text = text.replace(key, str(Alfavit[key]))
+    return text
