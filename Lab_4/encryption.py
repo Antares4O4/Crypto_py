@@ -3,7 +3,7 @@ import assistant_functions as af
 
 
 def enc(e, n, text):  # Шифрование
-    print(f"e = {e}, n = {n}")
+
 
     C = []
     M = bl.blocks(text, n)
