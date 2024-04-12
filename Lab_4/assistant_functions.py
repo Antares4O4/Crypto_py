@@ -5,21 +5,16 @@ Alfavit = {'А': 10, 'Б': 11, 'В': 12, 'Г': 13, 'Д': 14, 'Е': 15, 'Ж': 16,
 Alf_2 = {v: k for k, v in Alfavit.items()}
 
 
-def num_to_text(text):  # Преобразование из чисел в буквы
-
+def num_to_text_enc(text):  # Преобразование из чисел в буквы
     for key in Alf_2.keys():
         text = text.replace(str(key), str(Alf_2[key]))
-    print(text)
     return text
 
 
-def num_to_text_3(nums):
+def num_to_text_dec(str_num):
     text = ""
-    # так как один символ заменялся на двузначное число, то разбиваем последовательность на двузначные числа
-
-    for i in range(0, len(nums), 2):
-        text += Alf_2[int(nums[i: i + 2])]  # с помощью обратного словаря заменяем числа на соответственные им символы
-
+    for i in range(0, len(str_num), 2):
+        text += Alf_2[int(str_num[i: i + 2])]
     return text
 
 
@@ -68,10 +63,3 @@ def text_to_num_3(text):
     for key in Alfavit.keys():
         text = text.replace(key, str(Alfavit[key]))
     return text
-
-
-def num_to_text_2(text):
-    print(f"text_2 = {text}")
-    decrypted_text = ''.join([Alf_2[int(text[i:i + 2])] for i in range(0, len(text), 2)])
-    print(f"2 = {decrypted_text}")
-    return decrypted_text

@@ -12,6 +12,6 @@ def enc(e, n, text):  # Шифрование
         C.append(af.fast_pow(M[i], e) % n)
 
     C_str = af.list_to_str(C)
-    C_text = af.num_to_text(C_str)
+    C_text = af.num_to_text_enc(C_str)
 
     return C_text

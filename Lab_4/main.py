@@ -3,7 +3,7 @@ from tkinter import filedialog
 import encryption
 import decryption
 
-e, n, d = 51793, 84671, 24889
+e, n, d = 51173, 84671, 66677
 
 
 def main_enc(e, n, path_0):
