@@ -28,18 +28,6 @@ def list_to_str(l):  # Преобразование массива в строк
     return string
 
 
-def fast_pow(x, y):  # Возведение в степень
-    if y == 0:
-        return 1
-    if y == -1:
-        return 1. / x
-    num = fast_pow(x, y // 2)
-    num *= num
-    if y % 2:
-        num *= x
-    return num
-
-
 def multiplicative_inverse(a, b):  # Расширенный алгоритм Евклида для нахождения e
     x = 0
     y = 1
@@ -63,3 +51,15 @@ def text_to_num_3(text):
     for key in Alfavit.keys():
         text = text.replace(key, str(Alfavit[key]))
     return text
+
+def num_to_text_2(text):
+    decrypted_text = ''.join([Alf_2[int(text[i:i + 2])] for i in range(0, len(text), 2)])
+    return decrypted_text
+    print("Расшифрованный текст:", decrypted_text)
+
+def num_to_text(text):  # Преобразование из чисел в буквы
+    Alf_2 = {v: k for k, v in Alfavit.items()}
+    for key in Alf_2.keys():
+        text = text.replace(str(key), str(Alf_2[key]))
+    return text
+
