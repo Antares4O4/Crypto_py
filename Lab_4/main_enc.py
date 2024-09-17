@@ -1,6 +1,6 @@
 import encryption
 
-e, n, d = 51173, 84671, 66677
+e, n, d = 84671, 66677
 
 
 def main_enc(e, n):

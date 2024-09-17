@@ -24,7 +24,7 @@ def poly_division(dividend, divisor):
 
 def crc_remainder(data, polynom):
     # Вычисление остатка CRC
-    dividend = data + '0' * (len(polynom) - 1)
+    dividend = data + '0' * (len(polynom))
     remainder = poly_division(dividend, polynom)
     return remainder
 
@@ -47,7 +47,7 @@ def find_crc_collisions(polynom):
             hashes[hash_value] = [i]
 
     # Находим коллизии
-    collisions = {key: value for key, value in hashes.items() if len(value) > 1}
+    collisions = {key: value for key, value in hashes.items() if len(value) > 2}
 
     # Выводим результаты
     print("Коллизии:")
@@ -56,5 +56,5 @@ def find_crc_collisions(polynom):
 
 
 polynom = "111"
-print(crc_remainder("100010110", polynom))
+print(crc_remainder("10101010", polynom))
 find_crc_collisions(polynom)
