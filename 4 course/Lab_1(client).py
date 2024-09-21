@@ -1,76 +1,79 @@
 import socket
 import threading
 import tkinter as tk
-from tkinter import scrolledtext, messagebox
+from tkinter import scrolledtext
 
-# Настройки
-HOST = '127.0.0.1'
-PORT = 12345
+# Параметры клиента
+HOST = '192.168.1.36'  # IP-адрес сервера
+PORT = 65432           # Порт, который использует сервер
 
 class ClientApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Client")
+        self.root.title("Клиент")
+
+        # Создание текстовой области для отображения сообщений
+        self.chat_window = scrolledtext.ScrolledText(self.root, state='disabled', width=50, height=20)
+        self.chat_window.grid(row=0, column=0, padx=10, pady=10)
+
+        # Настройка тегов для окраски текста
+        self.chat_window.tag_configure("server", foreground="red")    # Слово "Сервер" - красное
+        self.chat_window.tag_configure("client", foreground="blue")   # Слово "Клиент" - синее
+        self.chat_window.tag_configure("info", foreground="green")    # Уведомления - зелёные
+
+        # Поле ввода для сообщений
+        self.message_entry = tk.Entry(self.root, width=40)
+        self.message_entry.grid(row=1, column=0, padx=10, pady=5)
+        self.message_entry.bind("<Return>", self.send_message)
+
+        # Кнопка отправки
+        self.send_button = tk.Button(self.root, text="Отправить", command=self.send_message)
+        self.send_button.grid(row=1, column=1, padx=10, pady=5)
+
         self.client_socket = None
 
-        # Интерфейс
-        self.create_widgets()
+        # Подключение к серверу в отдельном потоке
+        self.connect_to_server()
 
-    def create_widgets(self):
-        # Окно чата
-        self.chat_box = scrolledtext.ScrolledText(self.root, state='disabled', width=50, height=20)
-        self.chat_box.pack(padx=10, pady=10)
-
-        # Поле для ввода сообщений
-        self.entry_field = tk.Entry(self.root, width=40)
-        self.entry_field.pack(side=tk.LEFT, padx=10, pady=10)
-        self.entry_field.bind('<Return>', self.send_message)
-
-        # Кнопка для отправки сообщений
-        self.send_button = tk.Button(self.root, text="Отправить", command=self.send_message)
-        self.send_button.pack(side=tk.LEFT, padx=10, pady=10)
-
-        # Подключение к серверу
-        threading.Thread(target=self.start_client, daemon=True).start()
-
-    def start_client(self):
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    def connect_to_server(self):
         try:
+            self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.client_socket.connect((HOST, PORT))
-            self.append_message(f"Подключен к серверу {HOST}:{PORT}")
-            threading.Thread(target=self.receive_messages, daemon=True).start()
-        except ConnectionRefusedError:
-            messagebox.showerror("Ошибка", "Не удалось подключиться к серверу.")
+            self.chat_window.configure(state='normal')
+            self.chat_window.insert(tk.END, f"Подключено к серверу {HOST}:{PORT}\n", "info")
+            self.chat_window.configure(state='disabled')
+            threading.Thread(target=self.receive_message, daemon=True).start()
+        except Exception as e:
+            self.chat_window.configure(state='normal')
+            self.chat_window.insert(tk.END, f"Ошибка подключения: {e}\n", "info")
+            self.chat_window.configure(state='disabled')
 
-    def receive_messages(self):
+    def receive_message(self):
         while True:
             try:
-                message = self.client_socket.recv(1024).decode()
-                if not message:
+                data = self.client_socket.recv(1024)
+                if not data:
                     break
-                self.append_message(f"Сервер: {message}")
-            except ConnectionResetError:
-                self.append_message("Соединение разорвано.")
+                message = data.decode()
+                self.chat_window.configure(state='normal')
+                self.chat_window.insert(tk.END, "Сервер: ", "server")  # Окрашиваем слово "Сервер"
+                self.chat_window.insert(tk.END, f"{message}\n")         # Обычное сообщение без цвета
+                self.chat_window.configure(state='disabled')
+            except Exception as e:
+                self.chat_window.configure(state='normal')
+                self.chat_window.insert(tk.END, f"Ошибка при получении данных: {e}\n", "info")
+                self.chat_window.configure(state='disabled')
                 break
 
     def send_message(self, event=None):
-        message = self.entry_field.get()
-        if not message:
-            return
-        self.client_socket.send(message.encode())
-        self.append_message(f"Вы: {message}")
-        self.entry_field.delete(0, tk.END)
+        message = self.message_entry.get()
+        self.chat_window.configure(state='normal')
+        self.chat_window.insert(tk.END, "Клиент: ", "client")  # Окрашиваем слово "Клиент"
+        self.chat_window.insert(tk.END, f"{message}\n")         # Обычное сообщение без цвета
+        self.chat_window.configure(state='disabled')
+        self.client_socket.sendall(message.encode())
+        self.message_entry.delete(0, tk.END)
 
-        if message.lower() == 'exit':
-            self.root.quit()
-
-    def append_message(self, message):
-        self.chat_box.config(state='normal')
-        self.chat_box.insert(tk.END, message + '\n')
-        self.chat_box.config(state='disabled')
-        self.chat_box.yview(tk.END)
-
-# Запуск приложения
 if __name__ == "__main__":
     root = tk.Tk()
     app = ClientApp(root)
