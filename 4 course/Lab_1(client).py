@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import scrolledtext
 
 # Параметры клиента
-HOST = '192.168.1.36'  # IP-адрес сервера
+HOST = '127.0.0.1'  # IP-адрес сервера
 PORT = 65432           # Порт, который использует сервер
 
 class ClientApp:
