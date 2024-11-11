@@ -19,7 +19,7 @@ def decrypt_message(private_key, encrypted_message):
 
 # Серверное приложение
 class ServerApp:
-    def __init__(self, root, host='127.0.0.1', port=65432):
+    def __init__(self, root, host='192.168.1.34', port=65432):
         self.root = root
         self.root.title("Сервер")
         self.host, self.port = host, port
