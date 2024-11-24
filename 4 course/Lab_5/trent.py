@@ -6,6 +6,7 @@ import socket
 import time
 from utils import CryptoUtils, NetworkUtils
 from cryptography.hazmat.primitives import serialization
+import select
 
 
 class TrentWindow(QMainWindow):
@@ -16,9 +17,13 @@ class TrentWindow(QMainWindow):
         self.init_network()
         self.clients = {}
         self.is_running = False
+        self.sockets_list = []  # Список всех активных сокетов
+
+        self.check_timer = QTimer()
+        self.check_timer.timeout.connect(self.check_connections)
+        self.check_timer.setInterval(100)
 
     def initUI(self):
-        """Инициализация интерфейса"""
         self.setWindowTitle('Трент')
         self.setGeometry(100, 100, 400, 400)
 
@@ -26,12 +31,10 @@ class TrentWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
 
-        # Создание элементов интерфейса
         self.start_button = QPushButton('Запустить сервер')
         self.start_button.clicked.connect(self.toggle_server)
         layout.addWidget(self.start_button)
 
-        # Лог сообщений
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         layout.addWidget(self.log_text)
@@ -40,242 +43,227 @@ class TrentWindow(QMainWindow):
         layout.addWidget(self.status_label)
 
     def init_crypto(self):
-        """Инициализация криптографических ключей"""
         self.private_key, self.public_key = CryptoUtils.generate_key_pair()
 
     def init_network(self):
-        """Инициализация сетевого соединения"""
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.server_socket.bind(('localhost', 5002))
-        self.server_socket.listen(5)
+        # Устанавливаем неблокирующий режим
+        self.server_socket.setblocking(False)
+        try:
+            self.server_socket.bind(('localhost', 5000))
+            self.server_socket.listen(20)
+            self.log_message("Сервер успешно инициализирован на порту 5000")
+        except Exception as e:
+            self.log_message(f"Ошибка при инициализации сервера: {str(e)}")
+        self.sockets_list = [self.server_socket]
 
     def log_message(self, message):
-        """Добавление сообщения в лог"""
         current_time = time.strftime("%H:%M:%S")
         self.log_text.append(f"[{current_time}] {message}")
 
     def toggle_server(self):
-        """Переключение состояния сервера"""
         if not self.is_running:
             self.start_server()
         else:
             self.stop_server()
 
+    # Исправленная версия start_server
     def start_server(self):
-        """Запуск сервера"""
         try:
             self.is_running = True
             self.start_button.setText('Остановить сервер')
             self.status_label.setText('Статус: Сервер запущен')
             self.log_message("Сервер запущен")
-
-            # Запуск обработки подключений в отдельном потоке
-            self.server_thread = ServerThread(self.server_socket, self)
-            self.server_thread.message_received.connect(self.log_message)
-            self.server_thread.start()
-
+            # Запускаем таймер проверки подключений
+            self.check_timer.start()
         except Exception as e:
             self.log_message(f"Ошибка запуска сервера: {str(e)}")
             self.stop_server()
 
     def stop_server(self):
-        """Остановка сервера"""
         self.is_running = False
+        self.check_timer.stop()
         self.start_button.setText('Запустить сервер')
         self.status_label.setText('Статус: Сервер остановлен')
-
-        if hasattr(self, 'server_thread'):
-            self.server_thread.stop()
-            self.server_thread.wait()
-
         self.log_message("Сервер остановлен")
 
-    def closeEvent(self, event):
-        """Обработка закрытия окна"""
-        self.stop_server()
-        event.accept()
+    def check_connections(self):
+        if not self.is_running:
+            return
 
-
-class ServerThread(QThread):
-    message_received = pyqtSignal(str)
-
-    def __init__(self, server_socket, trent_window):
-        super().__init__()
-        self.server_socket = server_socket
-        self.trent_window = trent_window
-        self.running = True
-
-    def stop(self):
-        """Остановка потока"""
-        self.running = False
         try:
-            # Создаем временное подключение для разблокировки accept()
-            socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect(('localhost', 5002))
-        except:
-            pass
+            # Фильтруем только действительные сокеты
+            valid_sockets = [sock for sock in self.sockets_list if sock and sock.fileno() != -1]
 
-    def run(self):
-        """Основной цикл обработки подключений"""
-        while self.running:
+            if not valid_sockets:
+                self.sockets_list = [self.server_socket]
+                return
+
             try:
-                client_socket, address = self.server_socket.accept()
-                if not self.running:
-                    break
+                # Используем select с небольшим таймаутом
+                readable, _, exceptional = select.select(valid_sockets, [], valid_sockets, 0.1)
 
-                self.message_received.emit(f"Новое подключение: {address}")
-                self.handle_client(client_socket)
+                # Обработка исключительных ситуаций
+                for sock in exceptional:
+                    self.log_message(f"Исключительная ситуация для сокета")
+                    if sock in self.sockets_list:
+                        self.sockets_list.remove(sock)
+                    sock.close()
 
-            except Exception as e:
-                if self.running:
-                    self.message_received.emit(f"Ошибка при принятии подключения: {str(e)}")
+                for sock in readable:
+                    if sock == self.server_socket:
+                        # Новое подключение
+                        try:
+                            client_socket, address = self.server_socket.accept()
+                            client_socket.setblocking(False)
+                            self.sockets_list.append(client_socket)
+                            self.log_message(f"Новое подключение: {address}")
+                        except Exception as e:
+                            self.log_message(f"Ошибка при принятии подключения: {str(e)}")
+                    else:
+                        # Обработка данных от существующего клиента
+                        try:
+                            data = NetworkUtils.receive_message(sock)
+                            if data:
+                                self.log_message(f"Получены данные: {data}")
+                                if data.get('type') == 'register':
+                                    self.handle_registration(sock, data)
+                                elif data.get('type') == 'request_key':
+                                    self.handle_key_request(sock, data)
+                                    self.log_message("Запрос ключа обработан")
+                        except (ConnectionError, ConnectionResetError):
+                            self.log_message("Клиент отключился")
+                            if sock in self.sockets_list:
+                                self.sockets_list.remove(sock)
+                            sock.close()
+                            # Удаляем клиента из словаря clients если он там есть
+                            to_remove = []
+                            for name, client in self.clients.items():
+                                if client['socket'] == sock:
+                                    to_remove.append(name)
+                            for name in to_remove:
+                                del self.clients[name]
 
-    def handle_client(self, client_socket):
-        """Обработка клиентского подключения"""
-        try:
-            self.message_received.emit("Начало обработки клиента")
-
-            # Установка таймаута для сокета
-            client_socket.settimeout(20)
-
-            # Получение данных
-            data = NetworkUtils.receive_message(client_socket)
-            self.message_received.emit(f"Получены данные от клиента: {data}")
-
-            if data['type'] == 'register' or 'b\xad\xe8"\xb2\xd7\xab':
-                name = data['name']
-                self.message_received.emit(f"Обработка регистрации для {name}")
-
-                # Загрузка публичного ключа клиента
-                client_public_key = serialization.load_pem_public_key(
-                    data['public_key'].encode()
-                )
-                self.message_received.emit("Ключ клиента загружен успешно")
-
-                # Сохранение данных клиента
-                self.trent_window.clients[name] = {
-                    'public_key': client_public_key,
-                    'socket': client_socket
-                }
-                self.message_received.emit("Данные клиента сохранены")
-
-                # Подготовка ответа
-                public_bytes = self.trent_window.public_key.public_bytes(
-                    encoding=serialization.Encoding.PEM,
-                    format=serialization.PublicFormat.SubjectPublicKeyInfo
-                )
-
-                response = {
-                    'status': 'success',
-                    'public_key': public_bytes.decode()
-                }
-
-                self.message_received.emit(f"Отправка ответа клиенту {name}")
-                NetworkUtils.send_message(client_socket, response)
-                self.message_received.emit(f"Ответ отправлен клиенту {name}")
-
-            elif data['type'] == 'request_key':
-                self.handle_key_request(client_socket, data)
+            except select.error as e:
+                self.log_message(f"Ошибка select: {str(e)}")
+                # Очищаем недействительные сокеты
+                self.sockets_list = [sock for sock in self.sockets_list if sock and sock.fileno() != -1]
 
         except Exception as e:
-            error_msg = f"Ошибка обработки клиента: {str(e)}"
-            self.message_received.emit(error_msg)
+            self.log_message(f"Ошибка в check_connections: {str(e)}")
+            # В случае серьезной ошибки, очищаем список сокетов
+            self.sockets_list = [self.server_socket]
+
+    def handle_registration(self, client_socket, data):
+        try:
+            name = data.get('name')
+            if not name:
+                raise ValueError("Имя клиента не указано")
+
+            public_key_data = data.get('public_key')
+            if not public_key_data:
+                raise ValueError("Открытый ключ не предоставлен")
+
+            client_public_key = serialization.load_pem_public_key(
+                public_key_data.encode()
+            )
+
+            self.clients[name] = {
+                'public_key': client_public_key,
+                'socket': client_socket
+            }
+
+            response = {
+                'status': 'success',
+                'public_key': self.public_key.public_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo
+                ).decode()
+            }
+
+            NetworkUtils.send_message(client_socket, response)
+            self.log_message(f"Клиент {name} зарегистрирован")
+
+        except Exception as e:
+            self.log_message(f"Ошибка регистрации: {str(e)}")
             try:
                 error_response = {
                     'status': 'error',
                     'message': str(e)
                 }
                 NetworkUtils.send_message(client_socket, error_response)
-            except Exception as send_error:
-                self.message_received.emit(f"Ошибка отправки сообщения об ошибке: {str(send_error)}")
-
-    def handle_registration(self, client_socket, data):
-        """Обработка регистрации нового клиента"""
-        try:
-            self.message_received.emit("Начало регистрации клиента")
-            name = data['name']
-
-            # Загрузка публичного ключа клиента
-            self.message_received.emit(f"Загрузка ключа клиента {name}")
-            client_public_key = serialization.load_pem_public_key(
-                data['public_key'].encode()
-            )
-
-            # Сохранение данных клиента
-            self.trent_window.clients[name] = {
-                'public_key': client_public_key,
-                'socket': client_socket
-            }
-
-            # Подготовка ответа с публичным ключом Трента
-            self.message_received.emit("Подготовка ответа")
-            public_bytes = self.trent_window.public_key.public_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo
-            )
-
-            response = {
-                'status': 'success',
-                'public_key': public_bytes.decode()
-            }
-
-            # Отправка ответа
-            self.message_received.emit("Отправка ответа клиенту")
-            NetworkUtils.send_message(client_socket, response)
-            self.message_received.emit(f"Клиент {name} успешно зарегистрирован")
-
-        except Exception as e:
-            error_msg = f"Ошибка регистрации клиента: {str(e)}"
-            self.message_received.emit(error_msg)
-            try:
-                error_response = {
-                    'status': 'error',
-                    'message': error_msg
-                }
-                NetworkUtils.send_message(client_socket, error_response)
             except:
                 pass
 
-    def handle_key_request(self, client_socket, data):
-        """Обработка запроса открытого ключа"""
-        try:
-            requested_name = data['name']
-            self.message_received.emit(f"Запрос ключа для {requested_name}")
+    def show_connected_clients(self):
+        """Отображает список подключенных клиентов"""
+        self.log_message("Подключенные клиенты:")
+        for name in self.clients:
+            self.log_message(f"- {name}")
 
-            if requested_name not in self.trent_window.clients:
+    def handle_key_request(self, client_socket, data):
+        """Обработка запроса на получение открытого ключа"""
+        try:
+            self.log_message(f"Начало обработки запроса ключа: {data}")
+
+            # Получаем имя из запроса
+            requested_name = data.get('name')
+            if not requested_name:
+                raise ValueError("Не указано имя запрашиваемого клиента")
+
+            self.log_message(f"Ищем ключ для: {requested_name}")
+
+            # Проверяем наличие клиента
+            if requested_name not in self.clients:
                 raise ValueError(f"Клиент {requested_name} не найден")
 
-            requested_public_key = self.trent_window.clients[requested_name]['public_key']
+            # Получаем и конвертируем ключ
+            requested_public_key = self.clients[requested_name]['public_key']
             public_key_bytes = requested_public_key.public_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PublicFormat.SubjectPublicKeyInfo
-            )
+            ).decode()
 
-            # Создание подписи
-            signature_data = f"{requested_name},{public_key_bytes.decode()}"
-            signature = CryptoUtils.sign_message(
-                self.trent_window.private_key,
-                signature_data
-            )
+            # Заменяем символы новой строки на \n для согласованности
+            public_key_str = public_key_bytes.replace('\n', '\\n')
 
+            # Создаем строку для подписи
+            message_to_sign = f"{requested_name},{public_key_str}"
+            self.log_message(f"Подписываем сообщение: {message_to_sign}")
+
+            # Создаем подпись
+            signature = CryptoUtils.sign_message(self.private_key, message_to_sign)
+
+            # Формируем ответ
             response = {
                 'status': 'success',
-                'public_key': public_key_bytes.decode(),
-                'signature': signature.hex()
+                'public_key': public_key_bytes,  # Оригинальный ключ с реальными переносами строк
+                'signature': signature.hex(),
+                'signed_data': message_to_sign  # Подписанные данные с экранированными переносами
             }
 
-            self.message_received.emit(f"Отправка ключа для {requested_name}")
+            self.log_message(f"Отправляем ответ с ключом")
             NetworkUtils.send_message(client_socket, response)
-            self.message_received.emit(f"Ключ отправлен для {requested_name}")
+            self.log_message("Ответ отправлен")
 
         except Exception as e:
-            error_msg = f"Ошибка отправки ключа: {str(e)}"
-            self.message_received.emit(error_msg)
-            error_response = {
-                'status': 'error',
-                'message': str(e)
-            }
-            NetworkUtils.send_message(client_socket, error_response)
+            error_msg = f"status=error|message={str(e)}"
+            NetworkUtils.send_message(client_socket, {'status': 'error', 'message': str(e)})
+            self.log_message(f"Ошибка обработки запроса ключа: {str(e)}")
+
+    def closeEvent(self, event):
+        """Корректное закрытие всех соединений"""
+        self.is_running = False
+        self.check_timer.stop()
+        for sock in self.sockets_list:
+            try:
+                sock.close()
+            except:
+                pass
+        self.sockets_list.clear()
+        self.clients.clear()
+        event.accept()
 
 
 if __name__ == '__main__':
